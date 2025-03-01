@@ -1,40 +1,19 @@
 import { useState } from "react";
-import { useDropzone } from "react-dropzone";
 import "./App.css";
 import BlockNote from "./components/BlockNote/BlockNote";
+import useFileUpload from "./custom hooks/useFileUpload";
+import PdfPreviewModal from "./components/pdfPreviewModal";
+import CsvPreviewModal from "./components/csvPreviewModal";
 
 function App() {
-  const [csvFile, setCsvFile] = useState(null);
-  const [resume, setResume] = useState(null);
-  const [coverLetter, setCoverLetter] = useState(null);
+  const csvUpload = useFileUpload({ "text/csv": [".csv"] });
+  const resumeUpload = useFileUpload({ "application/pdf": [".pdf"] });
+  const coverLetterUpload = useFileUpload({ "application/pdf": [".pdf"] });
 
-  // Dropzone handler
-  const onDrop = (acceptedFiles, type) => {
-    const file = acceptedFiles[0];
-    if (file) {
-      if (type === "csv") setCsvFile(file);
-      else if (type === "resume") setResume(file);
-      else if (type === "coverLetter") setCoverLetter(file);
-    }
-  };
-
-  const dropzoneOptions = (type) => ({
-    onDrop: (files) => onDrop(files, type),
-    accept:
-      type === "csv"
-        ? { "text/csv": [".csv"] }
-        : {
-            "application/pdf": [".pdf"],
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [
-              ".docx",
-            ],
-          },
-    multiple: false,
-  });
-
-  const csvDropzone = useDropzone(dropzoneOptions("csv"));
-  const resumeDropzone = useDropzone(dropzoneOptions("resume"));
-  const coverLetterDropzone = useDropzone(dropzoneOptions("coverLetter"));
+  const [pdfPreviewFile, setPdfPreviewFile] = useState(null);
+  const [csvPreviewFile, setCsvPreviewFile] = useState(null);
+  const [isPdfPreviewOpen, setIsPdfPreviewOpen] = useState(false);
+  const [isCsvPreviewOpen, setIsCsvPreviewOpen] = useState(false);
 
   return (
     <div className="flex flex-col h-screen bg-gray-50 p-8 space-y-8">
@@ -47,40 +26,53 @@ function App() {
       {/* Dropzone Row */}
       <div className="grid grid-cols-3 gap-6">
         {[
-          {
-            dropzone: csvDropzone,
-            file: csvFile,
-            borderColor: "border-blue-500",
-            bgColor: "bg-blue-100 hover:bg-blue-200",
-            textColor: "text-blue-800",
-            placeholder: "Upload CSV File (Recipients List)",
-          },
-          {
-            dropzone: resumeDropzone,
-            file: resume,
-            borderColor: "border-green-500",
-            bgColor: "bg-green-100 hover:bg-green-200",
-            textColor: "text-green-800",
-            placeholder: "Upload Resume (PDF/DOCX)",
-          },
-          {
-            dropzone: coverLetterDropzone,
-            file: coverLetter,
-            borderColor: "border-yellow-500",
-            bgColor: "bg-yellow-100 hover:bg-yellow-200",
-            textColor: "text-yellow-800",
-            placeholder: "Upload Cover Letter (PDF/DOCX)",
-          },
-        ].map(({ dropzone, file, borderColor, bgColor, textColor, placeholder }, index) => (
-          <div
-            key={index}
-            {...dropzone.getRootProps()}
-            className={`border ${borderColor} p-4 rounded-lg ${bgColor} text-center cursor-pointer transition-transform transform hover:scale-105 shadow-md`}
-          >
-            <input {...dropzone.getInputProps()} />
-            <p className={`${textColor} font-medium`}>
-              {file ? file.name : placeholder}
-            </p>
+          { upload: csvUpload, borderColor: "border-blue-500", bgColor: "bg-blue-100 hover:bg-blue-200", textColor: "text-blue-800", placeholder: "Upload CSV File (Recipients List)" },
+          { upload: resumeUpload, borderColor: "border-green-500", bgColor: "bg-green-100 hover:bg-green-200", textColor: "text-green-800", placeholder: "Upload Resume (PDF)" },
+          { upload: coverLetterUpload, borderColor: "border-yellow-500", bgColor: "bg-yellow-100 hover:bg-yellow-200", textColor: "text-yellow-800", placeholder: "Upload Cover Letter (PDF)" },
+        ].map(({ upload, borderColor, bgColor, textColor, placeholder }, index) => (
+          <div key={index} className="space-y-2">
+            {/* Dropzone */}
+            <div
+              {...upload.dropzone.getRootProps()}
+              className={`border ${borderColor} w-full h-28 flex items-center justify-center p-4 rounded-lg ${bgColor} text-center cursor-pointer transition-transform transform hover:scale-105 shadow-md`}
+            >
+              <input {...upload.dropzone.getInputProps()} />
+              <p className={`${textColor} font-medium text-sm text-center`}>
+                {upload.file ? upload.file.name : placeholder}
+              </p>
+            </div>
+
+            {/* Uploaded File Preview */}
+            {upload.file && (
+              <div className="flex items-center justify-between bg-white p-2 rounded-lg shadow-md border border-gray-300 w-full">
+                {upload.file.type === "application/pdf" ? (
+                  <button
+                    className="text-blue-500 text-sm font-medium underline truncate w-3/4 text-left"
+                    onClick={() => {
+                      setPdfPreviewFile(upload.file);
+                      setIsPdfPreviewOpen(true);
+                    }}
+                  >
+                    {upload.file.name}
+                  </button>
+                ) : upload.file.type === "text/csv" ? (
+                  <button
+                    className="text-green-500 text-sm font-medium underline truncate w-3/4 text-left"
+                    onClick={() => {
+                      setCsvPreviewFile(upload.file);
+                      setIsCsvPreviewOpen(true);
+                    }}
+                  >
+                    {upload.file.name}
+                  </button>
+                ) : (
+                  <p className="text-gray-700 text-sm truncate w-3/4">{upload.file.name}</p>
+                )}
+                <button className="text-red-500 text-sm font-bold px-2" onClick={upload.removeFile}>
+                  ❌
+                </button>
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -103,6 +95,20 @@ function App() {
           Send Email
         </button>
       </div>
+
+      {/* PDF Preview Modal */}
+      <PdfPreviewModal
+        file={pdfPreviewFile}
+        isOpen={isPdfPreviewOpen}
+        onClose={() => setIsPdfPreviewOpen(false)}
+      />
+
+      {/* CSV Preview Modal */}
+      <CsvPreviewModal
+        file={csvPreviewFile}
+        isOpen={isCsvPreviewOpen}
+        onClose={() => setIsCsvPreviewOpen(false)}
+      />
     </div>
   );
 }
