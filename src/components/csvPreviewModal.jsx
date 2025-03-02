@@ -1,57 +1,59 @@
-import { useState, useEffect } from "react";
+import React from "react";
+import {DataGrid} from "react-data-grid";
+import "react-data-grid/lib/styles.css";
+import useCsvParser from "../custom hooks/useCsvParser";
 
-function CsvPreviewModal({ file, isOpen, onClose }) {
-  const [csvData, setCsvData] = useState([]);
+const CsvPreviewModal = ({ file, isOpen, onClose }) => {
+  const { columns, rows, setRows, setColumns } = useCsvParser(file);
 
-  useEffect(() => {
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const text = e.target.result;
-        const rows = text.split("\n").map((row) => row.split(","));
-        setCsvData(rows);
-      };
-      reader.readAsText(file);
+  if (!isOpen) return null;
+
+  const editableColumns = columns.map((col) => ({
+    ...col,
+    renderHeaderCell: () => (
+      <input
+        type="text"
+        defaultValue={col.name}
+        className="w-full bg-transparent text-black font-semibold border-none focus:ring-2 focus:ring-blue-400"
+        onBlur={(e) => handleColumnNameChange(col.key, e.target.value)}
+      />
+    ),
+  }));
+  function onCellClick(args, event) {
+    if (args.column.key === "id") {
+      // event.preventGridDefault();
+      // args.selectCell(true);
     }
-  }, [file]);
 
-  if (!isOpen || !file) return null;
+    console.log(args)
+  }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white p-6 rounded-lg shadow-lg w-[80vw] h-[80vh] flex flex-col">
+    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+      <div className="bg-white w-4/5 h-3/5 rounded-lg shadow-lg flex flex-col">
         {/* Modal Header */}
-        <div className="flex justify-between items-center pb-4 border-b">
-          <h2 className="text-xl font-bold">CSV Preview</h2>
-          <button onClick={onClose} className="text-red-500 text-2xl font-bold">✖</button>
+        <div className="flex justify-between items-center px-4 py-3 border-b">
+          <h2 className="text-lg font-semibold">CSV Preview</h2>
+          <button
+            onClick={onClose}
+            className="text-gray-600 hover:text-red-500 text-xl font-bold"
+          >
+            &times;
+          </button>
         </div>
 
-        {/* CSV Table Viewer */}
-        <div className="flex-grow overflow-auto mt-4 border">
-          <table className="w-full border-collapse">
-            <thead className="bg-gray-200 text-gray-700">
-              {csvData.length > 0 && (
-                <tr>
-                  {csvData[0].map((col, index) => (
-                    <th key={index} className="border px-4 py-2">{col}</th>
-                  ))}
-                </tr>
-              )}
-            </thead>
-            <tbody>
-              {csvData.slice(1).map((row, rowIndex) => (
-                <tr key={rowIndex} className="border">
-                  {row.map((col, colIndex) => (
-                    <td key={colIndex} className="border px-4 py-2">{col}</td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        {/* CSV Data Grid */}
+        <div className="flex-grow overflow-auto p-4">
+          <DataGrid
+            columns={columns}
+            rows={rows}
+            className="rdg-light"
+          />
+
         </div>
       </div>
     </div>
   );
-}
+};
 
 export default CsvPreviewModal;

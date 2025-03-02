@@ -3571,6 +3571,13 @@ rc@^1.2.7:
     minimist "^1.2.0"
     strip-json-comments "~2.0.1"
 
+react-data-grid@^7.0.0-beta.48:
+  version "7.0.0-beta.48"
+  resolved "https://registry.yarnpkg.com/react-data-grid/-/react-data-grid-7.0.0-beta.48.tgz#bf07ae15fbb1049a64a970db180c9194f31e1914"
+  integrity sha512-dCOi4XGV4oGlyv1cy9YlNCUAf/rdO3C7PQaoCRilC8hBWsz8UhNnXi5/eq9SzpfbY4vU97FGM19bTGpRzrwKHA==
+  dependencies:
+    clsx "^2.0.0"
+
 react-dom@^19.0.0:
   version "19.0.0"
   resolved "https://registry.yarnpkg.com/react-dom/-/react-dom-19.0.0.tgz#43446f1f01c65a4cd7f7588083e686a6726cfb57"
