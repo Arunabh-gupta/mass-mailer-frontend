@@ -18,6 +18,7 @@ export default function BlockNote() {
 
     setEmailTemplate(templateString);
     console.log("Updated Template String:\n", templateString);
+    console.log(typeof templateString)
   };
 
   return (

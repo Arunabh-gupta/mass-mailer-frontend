@@ -10,10 +10,9 @@ function App() {
   const resumeUpload = useFileUpload({ "application/pdf": [".pdf"] });
   const coverLetterUpload = useFileUpload({ "application/pdf": [".pdf"] });
 
-  const [pdfPreviewFile, setPdfPreviewFile] = useState(null);
-  const [csvPreviewFile, setCsvPreviewFile] = useState(null);
-  const [isPdfPreviewOpen, setIsPdfPreviewOpen] = useState(false);
-  const [isCsvPreviewOpen, setIsCsvPreviewOpen] = useState(false);
+  const [previewFile, setPreviewFile] = useState(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [passKey, setPassKey] = useState("");
 
   return (
     <div className="flex flex-col h-screen bg-gray-50 p-8 space-y-8">
@@ -21,6 +20,31 @@ function App() {
       <div className="text-center">
         <h1 className="text-3xl font-extrabold text-gray-900">📧 Bulk Email Sender</h1>
         <p className="text-gray-600 mt-2">Send personalized emails to multiple recipients with ease.</p>
+      </div>
+
+      {/* Pass Key Input */}
+      <div className="flex flex-col space-y-2">
+        <label className="text-gray-700 font-medium" htmlFor="passKey">
+          Nodemailer Pass Key:
+        </label>
+        <input
+          type="password"
+          id="passKey"
+          value={passKey}
+          onChange={(e) => setPassKey(e.target.value)}
+          placeholder="Enter your Nodemailer pass key"
+          className="border border-gray-300 p-3 rounded-lg w-full shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+        />
+
+        {/* YouTube Tutorial Link */}
+        <a
+          href="https://www.youtube.com/shorts/etJJ5_vvFgQ"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-500 hover:underline text-sm"
+        >
+          📺 Watch a YouTube tutorial on getting a passkey from your google account
+        </a>
       </div>
 
       {/* Dropzone Row */}
@@ -49,18 +73,8 @@ function App() {
                   <button
                     className="text-blue-500 text-sm font-medium underline truncate w-3/4 text-left"
                     onClick={() => {
-                      setPdfPreviewFile(upload.file);
-                      setIsPdfPreviewOpen(true);
-                    }}
-                  >
-                    {upload.file.name}
-                  </button>
-                ) : upload.file.type === "text/csv" ? (
-                  <button
-                    className="text-green-500 text-sm font-medium underline truncate w-3/4 text-left"
-                    onClick={() => {
-                      setCsvPreviewFile(upload.file);
-                      setIsCsvPreviewOpen(true);
+                      setPreviewFile(upload.file);
+                      setIsPreviewOpen(true);
                     }}
                   >
                     {upload.file.name}
@@ -98,16 +112,16 @@ function App() {
 
       {/* PDF Preview Modal */}
       <PdfPreviewModal
-        file={pdfPreviewFile}
-        isOpen={isPdfPreviewOpen}
-        onClose={() => setIsPdfPreviewOpen(false)}
+        file={previewFile}
+        isOpen={isPreviewOpen}
+        onClose={() => setIsPreviewOpen(false)}
       />
 
       {/* CSV Preview Modal */}
       <CsvPreviewModal
-        file={csvPreviewFile}
-        isOpen={isCsvPreviewOpen}
-        onClose={() => setIsCsvPreviewOpen(false)}
+        file={previewFile}
+        isOpen={isPreviewOpen}
+        onClose={() => setIsPreviewOpen(false)}
       />
     </div>
   );
