@@ -32,9 +32,9 @@ const useSendEmail = () => {
       // Email options
       const options = {
         from: "you@example.com",
-        to,
-        subject,
-        html: emailHtml,
+        to, // use the emails from the csv file. Make a loop
+        subject, // take it from the object recived from the blocknote.jsx
+        html: emailHtml, // use the template string made in the blockNote.jsx
       };
 
       // Send email
