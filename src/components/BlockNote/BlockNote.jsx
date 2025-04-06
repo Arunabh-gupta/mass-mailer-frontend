@@ -2,12 +2,16 @@ import "@blocknote/core/fonts/inter.css";
 import { BlockNoteView } from "@blocknote/mantine";
 import "@blocknote/mantine/style.css";
 import { useCreateBlockNote } from "@blocknote/react";
-import { useState } from "react";
-
+import { useEffect, useState } from "react";
+import useStateStore from "../../store.js"
 export default function BlockNote() {
   // Create the editor instance
   const editor = useCreateBlockNote();
   const [emailTemplate, setEmailTemplate] = useState("");
+
+
+  // import global states for email content
+  const {emailContent, updateEmailContent} = useStateStore();
 
   // Function to extract and convert content into a template string
   const detectChange = async () => {
@@ -17,9 +21,10 @@ export default function BlockNote() {
     const templateString = html.replace(/\{\{(.*?)\}\}/g, "${$1}");
 
     setEmailTemplate(templateString);
-    console.log("Updated Template String:\n", templateString);
-    console.log(typeof templateString)
+    updateEmailContent(templateString);
   };
+
+  
 
   return (
     <div className="flex flex-col gap-4">

@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import BlockNote from "../components/BlockNote/BlockNote";
 import useFileUpload from "../custom hooks/useFileUpload";
 import PdfPreviewModal from "../components/pdfPreviewModal";
 import CsvPreviewModal from "../components/csvPreviewModal";
-
+import useStateStore from "../store.js"
 function HomePage() {
 	  const csvUpload = useFileUpload({ "text/csv": [".csv"] });
 	  const resumeUpload = useFileUpload({ "application/pdf": [".pdf"] });
@@ -11,8 +11,19 @@ function HomePage() {
 
 	  const [previewFile, setPreviewFile] = useState(null);
 	  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-	  const [passKey, setPassKey] = useState("");
+	  const {passKey, updatePassKey, 
+					 subject, updateSubject, 
+					 hostEmail, updateHostEmail,
+					 emailContent
+					} = useStateStore();
+	  
 
+		useEffect(()=>{
+			console.log("this is email content: ", emailContent)
+		}, [emailContent])
+		useEffect(()=>{
+			console.log("This is the subject of the mail: ",subject)
+		}, [subject])
 	  return (
 		      <div className="flex flex-col h-screen bg-gray-50 p-8 space-y-8">
 		        {/* Heading */}
@@ -90,11 +101,20 @@ function HomePage() {
 						          ))}
 		        </div>
 
+						{/* hostEmail input */}
+						<input
+		          type="text"
+		          placeholder="Enter your email..."
+		          className="border border-gray-300 p-3 rounded-lg w-full shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+							onChange={(e)=>updateHostEmail(e.target.value)}
+		        />
+
 		        {/* Email Subject Input */}
 		        <input
 		          type="text"
 		          placeholder="Subject"
 		          className="border border-gray-300 p-3 rounded-lg w-full shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+							onChange={(e)=>updateSubject(e.target.value)}
 		        />
 
 		        {/* Email Editor */}
