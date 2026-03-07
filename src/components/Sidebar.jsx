@@ -1,11 +1,9 @@
 import { Link, useLocation } from 'react-router-dom';
 
 const navItems = [
-  { path: '/', label: 'Home', icon: '🏠' },
+  { path: '/', label: 'Dashboard', icon: '🏠' },
   { path: '/templates', label: 'Email Templates', icon: '📧' },
-  { path: '/recruiters', label: 'Recruiters', icon: '👥' },
-  { path: '/companies', label: 'Companies', icon: '🏢' },
-  { path: '/contacts', label: 'Email Contacts', icon: '📮' },
+  { path: '/contacts', label: 'Contacts', icon: '📮' },
   { path: '/campaigns', label: 'Campaigns', icon: '📊' },
 ];
 
@@ -43,10 +41,10 @@ export default function Sidebar() {
 
       <div className="p-4 border-t border-gray-200">
         <Link
-          to="/contacts/create"
+          to="/contacts"
           className="block w-full text-center px-4 py-2 text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 transition-colors"
         >
-          Create Email Contact
+          View Contacts
         </Link>
       </div>
     </aside>
