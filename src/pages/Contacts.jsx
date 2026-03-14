@@ -3,11 +3,15 @@ import { Link } from 'react-router-dom';
 
 import { contactsApi } from '../api';
 import Alert from '../components/Alert';
+import ConfirmModal from '../components/ConfirmModal';
 import { useUiStore } from '../store/uiStore';
 
 export default function Contacts() {
   const [contacts, setContacts] = useState([]);
   const [searchText, setSearchText] = useState('');
+  const [contactToDelete, setContactToDelete] = useState(null);
+  const [deletePending, setDeletePending] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
   const loading = useUiStore((state) => state.loading);
   const error = useUiStore((state) => state.error);
   const clearError = useUiStore((state) => state.clearError);
@@ -33,6 +37,40 @@ export default function Contacts() {
         .includes(query),
     );
   }, [contacts, searchText]);
+
+  const handleDeleteClick = (contact) => {
+    setDeleteError('');
+    setContactToDelete(contact);
+  };
+
+  const handleDeleteCancel = () => {
+    if (deletePending) {
+      return;
+    }
+    setDeleteError('');
+    setContactToDelete(null);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!contactToDelete?.id) {
+      return;
+    }
+
+    setDeletePending(true);
+    const result = await contactsApi.remove(contactToDelete.id);
+    setDeletePending(false);
+
+    if (result.data) {
+      setContacts((current) =>
+        current.filter((contact) => String(contact.id) !== String(contactToDelete.id)),
+      );
+      setDeleteError('');
+      setContactToDelete(null);
+      return;
+    }
+
+    setDeleteError(typeof result.error === 'string' ? result.error : 'Failed to delete contact');
+  };
 
   return (
     <div>
@@ -88,13 +126,22 @@ export default function Contacts() {
                       <td className="px-4 py-3 text-sm text-gray-600">{contact.company}</td>
                       <td className="px-4 py-3 text-sm text-gray-600">{contact.role || '-'}</td>
                       <td className="px-4 py-3">
-                        <Link
-                          to={`/contacts/${contact.id}/edit`}
-                          state={{ contact }}
-                          className="text-sm font-medium text-blue-600 transition-colors hover:text-blue-700"
-                        >
-                          Edit Contact
-                        </Link>
+                        <div className="flex items-center gap-4">
+                          <Link
+                            to={`/contacts/${contact.id}/edit`}
+                            state={{ contact }}
+                            className="text-sm font-medium text-blue-600 transition-colors hover:text-blue-700"
+                          >
+                            Edit Contact
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteClick(contact)}
+                            className="text-sm font-medium text-red-600 transition-colors hover:text-red-700"
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -104,6 +151,22 @@ export default function Contacts() {
           </div>
         )}
       </div>
+
+      <ConfirmModal
+        open={Boolean(contactToDelete)}
+        title="Delete contact?"
+        message={
+          contactToDelete
+            ? `This will permanently delete "${contactToDelete.name}" from your contacts. This action cannot be undone.`
+            : ''
+        }
+        errorMessage={deleteError}
+        confirmLabel="Delete Contact"
+        confirmTone="danger"
+        busy={deletePending}
+        onConfirm={handleDeleteConfirm}
+        onCancel={handleDeleteCancel}
+      />
     </div>
   );
 }

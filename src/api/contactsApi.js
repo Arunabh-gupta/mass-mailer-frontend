@@ -37,4 +37,14 @@ export const contactsApi = {
       },
       'Failed to update contact',
     ),
+
+  remove: (contactId) =>
+    apiRequest(
+      async () => {
+        await apiClient.delete(`/contacts/${contactId}`);
+        return true;
+      },
+      'Failed to delete contact',
+      { suppressGlobalError: true },
+    ),
 };
