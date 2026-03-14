@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 
 import { templatesApi } from '../api';
 import Alert from '../components/Alert';
+import ConfirmModal from '../components/ConfirmModal';
 import { useUiStore } from '../store/uiStore';
 
 const formatDate = (isoDate) => {
@@ -14,6 +16,9 @@ const formatDate = (isoDate) => {
 export default function Templates() {
   const [templates, setTemplates] = useState([]);
   const [searchText, setSearchText] = useState('');
+  const [templateToDelete, setTemplateToDelete] = useState(null);
+  const [deletePending, setDeletePending] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
   const loading = useUiStore((state) => state.loading);
   const error = useUiStore((state) => state.error);
   const clearError = useUiStore((state) => state.clearError);
@@ -39,10 +44,51 @@ export default function Templates() {
     );
   }, [searchText, templates]);
 
+  const handleDeleteClick = (template) => {
+    clearError();
+    setDeleteError('');
+    setTemplateToDelete(template);
+  };
+
+  const handleDeleteCancel = () => {
+    if (deletePending) {
+      return;
+    }
+    setDeleteError('');
+    setTemplateToDelete(null);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!templateToDelete?.id) {
+      return;
+    }
+
+    setDeletePending(true);
+    const result = await templatesApi.remove(templateToDelete.id);
+    setDeletePending(false);
+
+    if (result.data) {
+      setTemplates((current) =>
+        current.filter((template) => String(template.id) !== String(templateToDelete.id)),
+      );
+      setDeleteError('');
+      setTemplateToDelete(null);
+      return;
+    }
+
+    setDeleteError(typeof result.error === 'string' ? result.error : 'Failed to delete template');
+  };
+
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Email Templates</h1>
+        <Link
+          to="/templates/new"
+          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+        >
+          Create Resume Template
+        </Link>
       </div>
 
       <Alert message={error} onClose={clearError} />
@@ -69,12 +115,13 @@ export default function Templates() {
                   <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Subject</th>
                   <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Body</th>
                   <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Updated</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredTemplates.length === 0 ? (
                   <tr>
-                    <td className="px-4 py-3 text-sm text-gray-500" colSpan={4}>
+                    <td className="px-4 py-3 text-sm text-gray-500" colSpan={5}>
                       No templates found
                     </td>
                   </tr>
@@ -90,6 +137,24 @@ export default function Templates() {
                       <td className="px-4 py-3 text-sm text-gray-600">
                         {formatDate(template.updated_at || template.created_at)}
                       </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-4">
+                          <Link
+                            to={`/templates/${template.id ?? template.name}/edit`}
+                            state={{ template }}
+                            className="text-sm font-medium text-blue-600 transition-colors hover:text-blue-700"
+                          >
+                            Edit Template
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteClick(template)}
+                            className="text-sm font-medium text-red-600 transition-colors hover:text-red-700"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))
                 )}
@@ -98,6 +163,22 @@ export default function Templates() {
           </div>
         )}
       </div>
+
+      <ConfirmModal
+        open={Boolean(templateToDelete)}
+        title="Delete template?"
+        message={
+          templateToDelete
+            ? `This will permanently delete "${templateToDelete.name}". This action cannot be undone.`
+            : ''
+        }
+        errorMessage={deleteError}
+        confirmLabel="Delete Template"
+        confirmTone="danger"
+        busy={deletePending}
+        onConfirm={handleDeleteConfirm}
+        onCancel={handleDeleteCancel}
+      />
     </div>
   );
 }

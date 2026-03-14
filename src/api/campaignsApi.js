@@ -11,6 +11,15 @@ export const campaignsApi = {
       'Failed to load campaigns',
     ),
 
+  get: (campaignId) =>
+    apiRequest(
+      async () => {
+        const response = await apiClient.get(`/campaigns/${campaignId}`);
+        return response.data;
+      },
+      'Failed to load campaign details',
+    ),
+
   listContacts: (campaignId) =>
     apiRequest(
       async () => {
@@ -18,6 +27,24 @@ export const campaignsApi = {
         return response.data;
       },
       'Failed to load campaign recipients',
+    ),
+
+  create: (payload) =>
+    apiRequest(
+      async () => {
+        const response = await apiClient.post('/campaigns', payload);
+        return response.data;
+      },
+      'Failed to create campaign',
+    ),
+
+  update: (campaignId, payload) =>
+    apiRequest(
+      async () => {
+        const response = await apiClient.put(`/campaigns/${campaignId}`, payload);
+        return response.data;
+      },
+      'Failed to update campaign',
     ),
 
   send: (campaignId) =>

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 
 import { contactsApi } from '../api';
 import Alert from '../components/Alert';
@@ -37,6 +38,12 @@ export default function Contacts() {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Contacts</h1>
+        <Link
+          to="/contacts/new"
+          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+        >
+          Create Contact
+        </Link>
       </div>
 
       <Alert message={error} onClose={clearError} />
@@ -63,12 +70,13 @@ export default function Contacts() {
                   <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Email</th>
                   <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Company</th>
                   <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Role</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredContacts.length === 0 ? (
                   <tr>
-                    <td className="px-4 py-3 text-sm text-gray-500" colSpan={4}>
+                    <td className="px-4 py-3 text-sm text-gray-500" colSpan={5}>
                       No contacts found
                     </td>
                   </tr>
@@ -79,6 +87,15 @@ export default function Contacts() {
                       <td className="px-4 py-3 text-sm text-gray-600">{contact.email}</td>
                       <td className="px-4 py-3 text-sm text-gray-600">{contact.company}</td>
                       <td className="px-4 py-3 text-sm text-gray-600">{contact.role || '-'}</td>
+                      <td className="px-4 py-3">
+                        <Link
+                          to={`/contacts/${contact.id}/edit`}
+                          state={{ contact }}
+                          className="text-sm font-medium text-blue-600 transition-colors hover:text-blue-700"
+                        >
+                          Edit Contact
+                        </Link>
+                      </td>
                     </tr>
                   ))
                 )}

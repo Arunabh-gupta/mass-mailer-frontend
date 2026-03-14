@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 
 import { campaignsApi } from '../api';
 import Alert from '../components/Alert';
@@ -98,6 +99,12 @@ export default function Campaigns() {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Campaigns</h1>
+        <Link
+          to="/campaigns/new"
+          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+        >
+          Create Campaign
+        </Link>
       </div>
 
       <Alert message={error} onClose={clearError} />
@@ -158,14 +165,23 @@ export default function Campaigns() {
                           {formatDate(campaign.created_at)}
                         </td>
                         <td className="px-4 py-3">
-                          <button
-                            type="button"
-                            disabled={!isDraft || isSendingCurrent}
-                            onClick={() => handleSendCampaign(campaign.id)}
-                            className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300"
-                          >
-                            {isSendingCurrent ? 'Sending...' : 'Send'}
-                          </button>
+                          <div className="flex items-center gap-3">
+                            <Link
+                              to={`/campaigns/${campaign.id}/edit`}
+                              state={{ campaign }}
+                              className="text-sm font-medium text-blue-600 transition-colors hover:text-blue-700"
+                            >
+                              Edit Campaign
+                            </Link>
+                            <button
+                              type="button"
+                              disabled={!isDraft || isSendingCurrent}
+                              onClick={() => handleSendCampaign(campaign.id)}
+                              className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+                            >
+                              {isSendingCurrent ? 'Sending...' : 'Send'}
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
