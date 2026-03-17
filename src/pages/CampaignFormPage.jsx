@@ -7,7 +7,6 @@ import { useUiStore } from '../store/uiStore';
 
 const emptyForm = {
   templateId: '',
-  status: 'draft',
   contactIds: [],
 };
 
@@ -16,7 +15,6 @@ const getContactIdentifier = (contact) =>
 
 const mapCampaignToForm = (campaign, recipientIds = []) => ({
   templateId: campaign?.template_id ? String(campaign.template_id) : '',
-  status: campaign?.status || 'draft',
   contactIds: recipientIds.map((value) => String(value)),
 });
 
@@ -100,15 +98,9 @@ export default function CampaignFormPage() {
     };
   }, [campaignId, clearError, isEditMode, location.state]);
 
-  const handleFieldChange = (event) => {
-    const { name, value } = event.target;
-    setFormData((current) => ({ ...current, [name]: value }));
-  };
-
   const handleTemplateChange = (event) => {
     const { value } = event.target;
     const selectedTemplate = templates.find((template) => String(template.id) === value);
-    console.log('Selected template:', selectedTemplate);
     setFormData((current) => ({
       ...current,
       templateId: selectedTemplate ? String(selectedTemplate.id) : '',
@@ -130,7 +122,6 @@ export default function CampaignFormPage() {
 
     const payload = {
       template_id: formData.templateId,
-      status: formData.status,
       contact_ids: formData.contactIds,
     };
 
@@ -171,7 +162,7 @@ export default function CampaignFormPage() {
           <p className="text-sm text-gray-600">Loading campaign details...</p>
         ) : (
           <form className="space-y-8" onSubmit={handleSubmit}>
-            <div className="grid gap-6 md:grid-cols-2">
+            <div className="grid gap-6">
               <label className="block">
                 <span className="mb-2 block text-sm font-medium text-gray-700">Resume Template</span>
                 <select
@@ -188,21 +179,6 @@ export default function CampaignFormPage() {
                       {template.name}
                     </option>
                   ))}
-                </select>
-              </label>
-
-              <label className="block">
-                <span className="mb-2 block text-sm font-medium text-gray-700">Status</span>
-                <select
-                  name="status"
-                  value={formData.status}
-                  onChange={handleFieldChange}
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="draft">Draft</option>
-                  <option value="sending">Sending</option>
-                  <option value="completed">Completed</option>
-                  <option value="failed">Failed</option>
                 </select>
               </label>
             </div>

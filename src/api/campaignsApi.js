@@ -47,6 +47,16 @@ export const campaignsApi = {
       'Failed to update campaign',
     ),
 
+  remove: (campaignId) =>
+    apiRequest(
+      async () => {
+        await apiClient.delete(`/campaigns/${campaignId}`);
+        return true;
+      },
+      'Failed to delete campaign',
+      { suppressGlobalError: true },
+    ),
+
   send: (campaignId) =>
     apiRequest(
       async () => {
@@ -54,5 +64,6 @@ export const campaignsApi = {
         return response.data;
       },
       'Failed to send campaign',
+      { suppressGlobalLoading: true },
     ),
 };

@@ -5,8 +5,11 @@ const extractErrorMessage = (error, fallbackMessage) =>
 
 export const apiRequest = async (requestFn, fallbackMessage, options = {}) => {
   const { startLoading, stopLoading, setError, clearError } = useUiStore.getState();
-  const { suppressGlobalError = false } = options;
-  startLoading();
+  const { suppressGlobalError = false, suppressGlobalLoading = false } = options;
+
+  if (!suppressGlobalLoading) {
+    startLoading();
+  }
 
   try {
     const data = await requestFn();
@@ -19,6 +22,8 @@ export const apiRequest = async (requestFn, fallbackMessage, options = {}) => {
     }
     return { data: null, error: message };
   } finally {
-    stopLoading();
+    if (!suppressGlobalLoading) {
+      stopLoading();
+    }
   }
 };
