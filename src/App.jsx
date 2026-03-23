@@ -1,3 +1,4 @@
+import { SignedIn, SignedOut } from '@clerk/clerk-react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import AppLayout from './layouts/AppLayout';
 import Dashboard from './pages/Dashboard';
@@ -10,16 +11,52 @@ import TemplateFormPage from './pages/TemplateFormPage';
 import Login from './pages/Login';
 import Register from './pages/Register';
 
+function ProtectedApp() {
+  return (
+    <>
+      <SignedIn>
+        <AppLayout />
+      </SignedIn>
+      <SignedOut>
+        <Navigate to="/login" replace />
+      </SignedOut>
+    </>
+  );
+}
+
+function PublicOnly({ children }) {
+  return (
+    <>
+      <SignedIn>
+        <Navigate to="/" replace />
+      </SignedIn>
+      <SignedOut>{children}</SignedOut>
+    </>
+  );
+}
+
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Public routes */}
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
+        <Route
+          path="/login/*"
+          element={(
+            <PublicOnly>
+              <Login />
+            </PublicOnly>
+          )}
+        />
+        <Route
+          path="/register/*"
+          element={(
+            <PublicOnly>
+              <Register />
+            </PublicOnly>
+          )}
+        />
 
-        {/* Protected routes with layout */}
-        <Route element={<AppLayout />}>
+        <Route element={<ProtectedApp />}>
           <Route path="/" element={<Dashboard />} />
           <Route path="/templates" element={<Templates />} />
           <Route path="/templates/new" element={<TemplateFormPage />} />
@@ -32,7 +69,6 @@ function App() {
           <Route path="/contacts/:contactId/edit" element={<ContactFormPage />} />
         </Route>
 
-        {/* Catch all - redirect to home */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
