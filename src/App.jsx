@@ -1,5 +1,6 @@
 import { SignedIn, SignedOut } from '@clerk/clerk-react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import ClerkTokenBridge from './components/ClerkTokenBridge';
 import AppLayout from './layouts/AppLayout';
 import Dashboard from './pages/Dashboard';
 import Templates from './pages/Templates';
@@ -38,6 +39,7 @@ function PublicOnly({ children }) {
 function App() {
   return (
     <BrowserRouter>
+      <ClerkTokenBridge />
       <Routes>
         <Route
           path="/login/*"
