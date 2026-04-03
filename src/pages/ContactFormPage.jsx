@@ -9,14 +9,14 @@ const emptyForm = {
   name: '',
   email: '',
   company: '',
-  role: '',
+  job_title: '',
 };
 
 const mapContactToForm = (contact) => ({
   name: contact?.name || '',
   email: contact?.email || '',
   company: contact?.company || '',
-  role: contact?.role || '',
+  job_title: contact?.job_title || '',
 });
 
 export default function ContactFormPage() {
@@ -86,7 +86,7 @@ export default function ContactFormPage() {
       name: formData.name.trim(),
       email: formData.email.trim(),
       company: formData.company.trim(),
-      role: formData.role.trim(),
+      job_title: formData.job_title.trim(),
     };
 
     const result = isEditMode
@@ -126,7 +126,7 @@ export default function ContactFormPage() {
           <p className="text-sm text-gray-600">Loading contact details...</p>
         ) : (
           <form className="space-y-6" onSubmit={handleSubmit}>
-            <div className="grid gap-6 md:grid-cols-2">
+            <div className="space-y-5">
               <label className="block">
                 <span className="mb-2 block text-sm font-medium text-gray-700">Name</span>
                 <input
@@ -164,11 +164,11 @@ export default function ContactFormPage() {
               </label>
 
               <label className="block">
-                <span className="mb-2 block text-sm font-medium text-gray-700">Role</span>
+                <span className="mb-2 block text-sm font-medium text-gray-700">Job Title</span>
                 <input
                   type="text"
-                  name="role"
-                  value={formData.role}
+                  name="job_title"
+                  value={formData.job_title}
                   onChange={handleChange}
                   className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />

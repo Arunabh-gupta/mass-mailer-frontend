@@ -32,7 +32,7 @@ export default function Contacts() {
     }
 
     return contacts.filter((contact) =>
-      `${contact.name} ${contact.email} ${contact.company} ${contact.role || ''}`
+      `${contact.name} ${contact.email} ${contact.company} ${contact.job_title || ''}`
         .toLowerCase()
         .includes(query),
     );
@@ -107,7 +107,7 @@ export default function Contacts() {
                   <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Name</th>
                   <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Email</th>
                   <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Company</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Role</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Job Title</th>
                   <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Actions</th>
                 </tr>
               </thead>
@@ -124,7 +124,7 @@ export default function Contacts() {
                       <td className="px-4 py-3 text-sm text-gray-900">{contact.name}</td>
                       <td className="px-4 py-3 text-sm text-gray-600">{contact.email}</td>
                       <td className="px-4 py-3 text-sm text-gray-600">{contact.company}</td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{contact.role || '-'}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600">{contact.job_title || '-'}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-4">
                           <Link
