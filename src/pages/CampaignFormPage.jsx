@@ -1,14 +1,19 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 
 import { campaignsApi, contactsApi, templatesApi } from '../api';
 import Alert from '../components/Alert';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { useUiStore } from '../store/uiStore';
 
 const emptyForm = {
   templateId: '',
   contactIds: [],
 };
+
+const CONTACT_PAGE_SIZE = 8;
+const FILTER_DEBOUNCE_MS = 350;
+const PAGE_SIZE_OPTIONS = [8, 16, 32, 64];
 
 const getContactIdentifier = (contact) =>
   contact?.contact_id ?? contact?.id ?? contact?.email ?? contact?.name ?? '';
@@ -26,10 +31,17 @@ export default function CampaignFormPage() {
   const [formData, setFormData] = useState(emptyForm);
   const [templates, setTemplates] = useState([]);
   const [contacts, setContacts] = useState([]);
+  const [contactSearchText, setContactSearchText] = useState('');
+  const [contactPage, setContactPage] = useState(1);
+  const [pageSize, setPageSize] = useState(CONTACT_PAGE_SIZE);
+  const [hasPreviousContactPage, setHasPreviousContactPage] = useState(false);
+  const [hasNextContactPage, setHasNextContactPage] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
+  const [contactsLoading, setContactsLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const error = useUiStore((state) => state.error);
   const clearError = useUiStore((state) => state.clearError);
+  const debouncedContactSearchText = useDebouncedValue(contactSearchText, FILTER_DEBOUNCE_MS);
 
   useEffect(() => {
     clearError();
@@ -41,17 +53,13 @@ export default function CampaignFormPage() {
     const loadPage = async () => {
       setPageLoading(true);
 
-      const [templatesResult, contactsResult] = await Promise.all([
-        templatesApi.list(),
-        contactsApi.list(),
-      ]);
+      const templatesResult = await templatesApi.list();
 
       if (!active) {
         return;
       }
 
       setTemplates(templatesResult.data || []);
-      setContacts(contactsResult.data || []);
 
       if (!isEditMode) {
         setFormData(emptyForm);
@@ -98,6 +106,60 @@ export default function CampaignFormPage() {
     };
   }, [campaignId, clearError, isEditMode, location.state]);
 
+  useEffect(() => {
+    let active = true;
+
+    const loadContacts = async () => {
+      setContactsLoading(true);
+
+      const result = await contactsApi.list(
+        {
+          page: contactPage,
+          page_size: pageSize,
+          query: debouncedContactSearchText.trim() || undefined,
+        },
+        { suppressGlobalLoading: true },
+      );
+
+      if (!active) {
+        return;
+      }
+
+      if (!result.data) {
+        setContacts([]);
+        setHasPreviousContactPage(contactPage > 1);
+        setHasNextContactPage(false);
+        setContactsLoading(false);
+        return;
+      }
+
+      setContacts(result.data.items || []);
+      setHasPreviousContactPage(Boolean(result.data.has_previous));
+      setHasNextContactPage(Boolean(result.data.has_next));
+      setContactsLoading(false);
+    };
+
+    loadContacts();
+
+    return () => {
+      active = false;
+    };
+  }, [
+    contactPage,
+    debouncedContactSearchText,
+    pageSize,
+  ]);
+
+  const visibleContactIds = useMemo(
+    () => contacts.map((contact) => String(getContactIdentifier(contact))).filter(Boolean),
+    [contacts],
+  );
+
+  const selectedVisibleCount = useMemo(
+    () => visibleContactIds.filter((contactId) => formData.contactIds.includes(contactId)).length,
+    [formData.contactIds, visibleContactIds],
+  );
+
   const handleTemplateChange = (event) => {
     const { value } = event.target;
     const selectedTemplate = templates.find((template) => String(template.id) === value);
@@ -114,6 +176,35 @@ export default function CampaignFormPage() {
         ? current.contactIds.filter((value) => value !== contactId)
         : [...current.contactIds, contactId],
     }));
+  };
+
+  const updateVisibleSelection = (shouldSelect) => {
+    setFormData((current) => {
+      const nextContactIds = new Set(current.contactIds);
+
+      visibleContactIds.forEach((contactId) => {
+        if (shouldSelect) {
+          nextContactIds.add(contactId);
+        } else {
+          nextContactIds.delete(contactId);
+        }
+      });
+
+      return {
+        ...current,
+        contactIds: Array.from(nextContactIds),
+      };
+    });
+  };
+
+  const handleSearchChange = (event) => {
+    setContactSearchText(event.target.value);
+    setContactPage(1);
+  };
+
+  const handlePageSizeChange = (event) => {
+    setPageSize(Number(event.target.value));
+    setContactPage(1);
   };
 
   const handleSubmit = async (event) => {
@@ -173,8 +264,7 @@ export default function CampaignFormPage() {
                   className="w-full rounded-lg border border-gray-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Select a template</option>
-                  {templates
-                    .map((template) => (
+                  {templates.map((template) => (
                     <option key={template.id} value={String(template.id)}>
                       {template.name}
                     </option>
@@ -184,14 +274,79 @@ export default function CampaignFormPage() {
             </div>
 
             <div>
-              <div className="mb-2 flex items-center justify-between">
-                <span className="block text-sm font-medium text-gray-700">Recipients</span>
-                <span className="text-sm text-gray-500">{formData.contactIds.length} selected</span>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <span className="block text-sm font-medium text-gray-700">Recipients</span>
+                  <p className="mt-1 text-sm text-gray-500">
+                    {formData.contactIds.length} selected across all pages and filters
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => updateVisibleSelection(true)}
+                    disabled={contacts.length === 0 || selectedVisibleCount === contacts.length}
+                    className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
+                  >
+                    Select All on Page
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => updateVisibleSelection(false)}
+                    disabled={selectedVisibleCount === 0}
+                    className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
+                  >
+                    Clear Page
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormData((current) => ({ ...current, contactIds: [] }))}
+                    disabled={formData.contactIds.length === 0}
+                    className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
+                  >
+                    Clear All
+                  </button>
+                </div>
+              </div>
+
+              <div className="mb-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_180px]">
+                <input
+                  type="text"
+                  value={contactSearchText}
+                  onChange={handleSearchChange}
+                  placeholder="Search by name, email, company, or job title"
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <label className="flex items-center gap-3 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600">
+                  <span>Page size</span>
+                  <select
+                    value={pageSize}
+                    onChange={handlePageSizeChange}
+                    className="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm text-gray-900 focus:outline-none focus:ring-0"
+                  >
+                    {PAGE_SIZE_OPTIONS.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3 text-sm text-gray-500">
+                <p>
+                  Showing {contacts.length} matching contact{contacts.length === 1 ? '' : 's'} on this page
+                </p>
+                <p>Page {contactPage}</p>
               </div>
 
               <div className="max-h-80 overflow-y-auto rounded-lg border border-gray-200">
-                {contacts.length === 0 ? (
-                  <p className="p-4 text-sm text-gray-600">No contacts available. Add contacts first.</p>
+                {contactsLoading ? (
+                  <p className="p-4 text-sm text-gray-600">Loading contacts...</p>
+                ) : contacts.length === 0 ? (
+                  <p className="p-4 text-sm text-gray-600">
+                    No contacts match these filters. Try adjusting the search or add contacts first.
+                  </p>
                 ) : (
                   contacts.map((contact) => {
                     const contactId = String(getContactIdentifier(contact));
@@ -212,12 +367,33 @@ export default function CampaignFormPage() {
                           <p className="text-sm font-medium text-gray-900">{contact.name}</p>
                           <p className="text-sm text-gray-600">
                             {contact.email} · {contact.company}
+                            {contact.job_title ? ` · ${contact.job_title}` : ''}
                           </p>
                         </div>
                       </label>
                     );
                   })
                 )}
+              </div>
+
+              <div className="mt-4 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => setContactPage((page) => Math.max(1, page - 1))}
+                  disabled={!hasPreviousContactPage}
+                  className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
+                >
+                  Previous
+                </button>
+                <span className="text-sm text-gray-600">Page {contactPage}</span>
+                <button
+                  type="button"
+                  onClick={() => setContactPage((page) => page + 1)}
+                  disabled={!hasNextContactPage}
+                  className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
+                >
+                  Next
+                </button>
               </div>
             </div>
 

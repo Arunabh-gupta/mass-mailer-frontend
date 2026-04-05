@@ -13,7 +13,7 @@ const formatDate = (isoDate) => {
 };
 
 export default function Dashboard() {
-  const [contacts, setContacts] = useState([]);
+  const [contactCount, setContactCount] = useState(0);
   const [templates, setTemplates] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
   const loading = useUiStore((state) => state.loading);
@@ -23,12 +23,12 @@ export default function Dashboard() {
   useEffect(() => {
     const loadDashboard = async () => {
       const [contactsResult, templatesResult, campaignsResult] = await Promise.all([
-        contactsApi.list(),
+        contactsApi.list({ page: 1, page_size: 1, include_totals: true }),
         templatesApi.list(),
         campaignsApi.list(),
       ]);
 
-      setContacts(contactsResult.data || []);
+      setContactCount(contactsResult.data?.total || 0);
       setTemplates(templatesResult.data || []);
       setCampaigns(campaignsResult.data || []);
     };
@@ -38,7 +38,7 @@ export default function Dashboard() {
 
   const stats = useMemo(
     () => [
-      { label: 'Total Contacts', value: contacts.length, icon: '📮' },
+      { label: 'Total Contacts', value: contactCount, icon: '📮' },
       { label: 'Email Templates', value: templates.length, icon: '📧' },
       { label: 'Total Campaigns', value: campaigns.length, icon: '📊' },
       {
@@ -47,7 +47,7 @@ export default function Dashboard() {
         icon: '✅',
       },
     ],
-    [contacts, templates, campaigns],
+    [campaigns, contactCount, templates],
   );
 
   const recentTemplates = useMemo(() => templates.slice(0, 5), [templates]);

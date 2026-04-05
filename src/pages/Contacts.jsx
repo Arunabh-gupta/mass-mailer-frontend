@@ -1,46 +1,80 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { contactsApi } from '../api';
 import Alert from '../components/Alert';
 import ConfirmModal from '../components/ConfirmModal';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { useUiStore } from '../store/uiStore';
+
+const PAGE_SIZE = 10;
+const FILTER_DEBOUNCE_MS = 500;
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 
 export default function Contacts() {
   const [contacts, setContacts] = useState([]);
   const [searchText, setSearchText] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
+  const [hasPreviousPage, setHasPreviousPage] = useState(false);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [tableLoading, setTableLoading] = useState(true);
   const [contactToDelete, setContactToDelete] = useState(null);
   const [deletePending, setDeletePending] = useState(false);
   const [deleteError, setDeleteError] = useState('');
   const [importPending, setImportPending] = useState(false);
   const [importError, setImportError] = useState('');
   const [importSummary, setImportSummary] = useState(null);
+  const [reloadKey, setReloadKey] = useState(0);
   const fileInputRef = useRef(null);
-  const loading = useUiStore((state) => state.loading);
   const error = useUiStore((state) => state.error);
   const clearError = useUiStore((state) => state.clearError);
-
-  const loadContacts = async () => {
-    const result = await contactsApi.list();
-    setContacts(result.data || []);
-  };
+  const debouncedSearchText = useDebouncedValue(searchText, FILTER_DEBOUNCE_MS);
 
   useEffect(() => {
+    let active = true;
+
+    const loadContacts = async () => {
+      setTableLoading(true);
+
+      const result = await contactsApi.list(
+        {
+          page: currentPage,
+          page_size: pageSize,
+          query: debouncedSearchText.trim() || undefined,
+        },
+        { suppressGlobalLoading: true },
+      );
+
+      if (!active) {
+        return;
+      }
+
+      if (!result.data) {
+        setContacts([]);
+        setHasPreviousPage(currentPage > 1);
+        setHasNextPage(false);
+        setTableLoading(false);
+        return;
+      }
+
+      setContacts(result.data.items || []);
+      setHasPreviousPage(Boolean(result.data.has_previous));
+      setHasNextPage(Boolean(result.data.has_next));
+      setTableLoading(false);
+    };
+
     loadContacts();
-  }, []);
 
-  const filteredContacts = useMemo(() => {
-    const query = searchText.trim().toLowerCase();
-    if (!query) {
-      return contacts;
-    }
-
-    return contacts.filter((contact) =>
-      `${contact.name} ${contact.email} ${contact.company} ${contact.job_title || ''}`
-        .toLowerCase()
-        .includes(query),
-    );
-  }, [contacts, searchText]);
+    return () => {
+      active = false;
+    };
+  }, [
+    currentPage,
+    debouncedSearchText,
+    pageSize,
+    reloadKey,
+  ]);
 
   const handleDeleteClick = (contact) => {
     setDeleteError('');
@@ -65,11 +99,14 @@ export default function Contacts() {
     setDeletePending(false);
 
     if (result.data) {
-      setContacts((current) =>
-        current.filter((contact) => String(contact.id) !== String(contactToDelete.id)),
-      );
       setDeleteError('');
       setContactToDelete(null);
+
+      if (contacts.length === 1 && currentPage > 1) {
+        setCurrentPage((page) => page - 1);
+      } else {
+        setReloadKey((value) => value + 1);
+      }
       return;
     }
 
@@ -105,7 +142,26 @@ export default function Contacts() {
     }
 
     setImportSummary(result.data);
-    await loadContacts();
+    setCurrentPage(1);
+    setReloadKey((value) => value + 1);
+  };
+
+  const handleSearchChange = (event) => {
+    setSearchText(event.target.value);
+    setCurrentPage(1);
+  };
+
+  const handlePageSizeChange = (event) => {
+    setPageSize(Number(event.target.value));
+    setCurrentPage(1);
+  };
+
+  const handlePreviousPage = () => {
+    setCurrentPage((page) => Math.max(1, page - 1));
+  };
+
+  const handleNextPage = () => {
+    setCurrentPage((page) => page + 1);
   };
 
   return (
@@ -150,9 +206,7 @@ export default function Contacts() {
           <p className="font-medium">
             Import finished. Imported {importSummary.imported_count} of {importSummary.total_rows} row(s).
           </p>
-          <p className="mt-1 text-emerald-800">
-            Skipped {importSummary.skipped_count} row(s).
-          </p>
+          <p className="mt-1 text-emerald-800">Skipped {importSummary.skipped_count} row(s).</p>
           {importSummary.errors.length > 0 ? (
             <div className="mt-3 rounded-md bg-white/70 px-3 py-3 text-emerald-950">
               <p className="font-medium">Import issues</p>
@@ -179,67 +233,111 @@ export default function Contacts() {
 
       <div className="rounded-lg border border-gray-200 bg-white">
         <div className="border-b border-gray-200 p-6">
-          <input
-            type="text"
-            value={searchText}
-            onChange={(event) => setSearchText(event.target.value)}
-            placeholder="Search contacts..."
-            className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+          <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_180px]">
+            <input
+              type="text"
+              value={searchText}
+              onChange={handleSearchChange}
+              placeholder="Search by name, email, company, or job title"
+              className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <label className="flex items-center gap-3 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600">
+              <span>Page size</span>
+              <select
+                value={pageSize}
+                onChange={handlePageSizeChange}
+                className="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm text-gray-900 focus:outline-none focus:ring-0"
+              >
+                {PAGE_SIZE_OPTIONS.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-gray-600">
+            <p>
+              Showing {contacts.length} contact{contacts.length === 1 ? '' : 's'} on this page
+            </p>
+            <p>Page {currentPage}</p>
+          </div>
         </div>
 
-        {loading ? (
+        {tableLoading ? (
           <p className="p-6 text-sm text-gray-600">Loading contacts...</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Name</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Email</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Company</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Job Title</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredContacts.length === 0 ? (
-                  <tr>
-                    <td className="px-4 py-3 text-sm text-gray-500" colSpan={5}>
-                      No contacts found
-                    </td>
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Name</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Email</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Company</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Job Title</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Actions</th>
                   </tr>
-                ) : (
-                  filteredContacts.map((contact) => (
-                    <tr key={contact.id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="px-4 py-3 text-sm text-gray-900">{contact.name}</td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{contact.email}</td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{contact.company}</td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{contact.job_title || '-'}</td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-4">
-                          <Link
-                            to={`/contacts/${contact.id}/edit`}
-                            state={{ contact }}
-                            className="text-sm font-medium text-blue-600 transition-colors hover:text-blue-700"
-                          >
-                            Edit Contact
-                          </Link>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteClick(contact)}
-                            className="text-sm font-medium text-red-600 transition-colors hover:text-red-700"
-                          >
-                            Delete
-                          </button>
-                        </div>
+                </thead>
+                <tbody>
+                  {contacts.length === 0 ? (
+                    <tr>
+                      <td className="px-4 py-3 text-sm text-gray-500" colSpan={5}>
+                        No contacts found
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                  ) : (
+                    contacts.map((contact) => (
+                      <tr key={contact.id} className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="px-4 py-3 text-sm text-gray-900">{contact.name}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600">{contact.email}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600">{contact.company}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600">{contact.job_title || '-'}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-4">
+                            <Link
+                              to={`/contacts/${contact.id}/edit`}
+                              state={{ contact }}
+                              className="text-sm font-medium text-blue-600 transition-colors hover:text-blue-700"
+                            >
+                              Edit Contact
+                            </Link>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteClick(contact)}
+                              className="text-sm font-medium text-red-600 transition-colors hover:text-red-700"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex items-center justify-between border-t border-gray-200 px-6 py-4">
+              <button
+                type="button"
+                onClick={handlePreviousPage}
+                disabled={!hasPreviousPage}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
+              >
+                Previous
+              </button>
+              <span className="text-sm text-gray-600">Page {currentPage}</span>
+              <button
+                type="button"
+                onClick={handleNextPage}
+                disabled={!hasNextPage}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
+              >
+                Next
+              </button>
+            </div>
+          </>
         )}
       </div>
 

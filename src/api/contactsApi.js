@@ -2,13 +2,14 @@ import { apiClient } from './client';
 import { apiRequest } from './request';
 
 export const contactsApi = {
-  list: () =>
+  list: (params = {}, options = {}) =>
     apiRequest(
       async () => {
-        const response = await apiClient.get('/contacts');
+        const response = await apiClient.get('/contacts', { params });
         return response.data;
       },
       'Failed to load contacts',
+      options,
     ),
 
   get: (contactId) =>
