@@ -29,6 +29,22 @@ export const contactsApi = {
       'Failed to create contact',
     ),
 
+  importCsv: (file) =>
+    apiRequest(
+      async () => {
+        const formData = new FormData();
+        formData.append('file', file);
+        const response = await apiClient.post('/contacts/import', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+        return response.data;
+      },
+      'Failed to import contacts',
+      { suppressGlobalError: true, suppressGlobalLoading: true },
+    ),
+
   update: (contactId, payload) =>
     apiRequest(
       async () => {
