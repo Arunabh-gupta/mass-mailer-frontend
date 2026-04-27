@@ -52,20 +52,15 @@ export default function Campaigns() {
       const templateNameById = new Map(
         templates.map((template) => [String(template.id), template.name]),
       );
-      const contactsResults = await Promise.all(
-        baseCampaigns.map((campaign) => campaignsApi.listContacts(campaign.id)),
-      );
 
-      const campaignRows = baseCampaigns.map((campaign, index) => {
-        const campaignContacts = contactsResults[index].data || [];
-        const sentCount = campaignContacts.filter((item) => item.status === 'sent').length;
-        return {
-          ...campaign,
-          template_name: templateNameById.get(String(campaign.template_id)) || 'Unknown template',
-          sent: sentCount,
-          total: campaignContacts.length,
-        };
-      });
+      const campaignRows = baseCampaigns.map((campaign) => ({
+        ...campaign,
+        template_name: templateNameById.get(String(campaign.template_id)) || 'Unknown template',
+        sent: campaign.status_summary?.sent_recipients || 0,
+        total: campaign.status_summary?.total_recipients || 0,
+        failed: campaign.status_summary?.failed_recipients || 0,
+        pending: campaign.status_summary?.pending_recipients || 0,
+      }));
 
       setCampaigns(campaignRows);
     };
@@ -122,6 +117,8 @@ export default function Campaigns() {
               status: sendResult.data.status,
               sent: sendResult.data.sent_recipients,
               total: sendResult.data.total_recipients,
+              pending: Math.max(sendResult.data.total_recipients - sendResult.data.sent_recipients, 0),
+              failed: 0,
             }
           : campaign,
       ),
@@ -228,7 +225,9 @@ export default function Campaigns() {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-600">
-                          {campaign.sent} / {campaign.total}
+                          {campaign.sent} sent / {campaign.total} total
+                          {campaign.pending > 0 ? ` / ${campaign.pending} pending` : ''}
+                          {campaign.failed > 0 ? ` / ${campaign.failed} failed` : ''}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-600">
                           {formatDate(campaign.created_at)}
