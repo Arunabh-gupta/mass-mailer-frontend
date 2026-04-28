@@ -2,13 +2,14 @@ import { apiClient } from './client';
 import { apiRequest } from './request';
 
 export const campaignsApi = {
-  list: () =>
+  list: (options = {}) =>
     apiRequest(
       async () => {
         const response = await apiClient.get('/campaigns');
         return response.data;
       },
       'Failed to load campaigns',
+      options,
     ),
 
   get: (campaignId) =>

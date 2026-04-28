@@ -6,6 +6,8 @@ import Alert from '../components/Alert';
 import ConfirmModal from '../components/ConfirmModal';
 import { useUiStore } from '../store/uiStore';
 
+const CAMPAIGN_REFRESH_INTERVAL_MS = 4000;
+
 const getStatusColor = (status) => {
   switch (status) {
     case 'completed':
@@ -28,12 +30,36 @@ const formatDate = (isoDate) => {
   return new Date(isoDate).toLocaleDateString();
 };
 
+const formatDateTime = (isoDate) => {
+  if (!isoDate) {
+    return '-';
+  }
+  return new Date(isoDate).toLocaleString();
+};
+
 const capitalize = (value) => value.charAt(0).toUpperCase() + value.slice(1);
+
+const getRecipientStatusColor = (status) => {
+  switch (status) {
+    case 'sent':
+      return 'bg-green-100 text-green-700';
+    case 'failed':
+      return 'bg-red-100 text-red-700';
+    case 'pending':
+      return 'bg-amber-100 text-amber-700';
+    default:
+      return 'bg-gray-100 text-gray-700';
+  }
+};
 
 export default function Campaigns() {
   const [campaigns, setCampaigns] = useState([]);
   const [searchText, setSearchText] = useState('');
   const [sendingCampaignId, setSendingCampaignId] = useState(null);
+  const [campaignActivity, setCampaignActivity] = useState(null);
+  const [campaignActivityRows, setCampaignActivityRows] = useState([]);
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [activityError, setActivityError] = useState('');
   const [campaignToDelete, setCampaignToDelete] = useState(null);
   const [deletingCampaignId, setDeletingCampaignId] = useState(null);
   const [deleteError, setDeleteError] = useState('');
@@ -41,32 +67,49 @@ export default function Campaigns() {
   const error = useUiStore((state) => state.error);
   const clearError = useUiStore((state) => state.clearError);
 
+  const loadCampaigns = async (options = {}) => {
+    const { suppressGlobalLoading = false } = options;
+    const [campaignsResult, templatesResult] = await Promise.all([
+      campaignsApi.list({ suppressGlobalLoading }),
+      templatesApi.list({ suppressGlobalLoading }),
+    ]);
+    const baseCampaigns = campaignsResult.data || [];
+    const templates = templatesResult.data || [];
+    const templateNameById = new Map(
+      templates.map((template) => [String(template.id), template.name]),
+    );
+
+    const campaignRows = baseCampaigns.map((campaign) => ({
+      ...campaign,
+      template_name: templateNameById.get(String(campaign.template_id)) || 'Unknown template',
+      sent: campaign.status_summary?.sent_recipients || 0,
+      total: campaign.status_summary?.total_recipients || 0,
+      failed: campaign.status_summary?.failed_recipients || 0,
+      pending: campaign.status_summary?.pending_recipients || 0,
+    }));
+
+    setCampaigns(campaignRows);
+    return campaignRows;
+  };
+
   useEffect(() => {
-    const loadCampaigns = async () => {
-      const [campaignsResult, templatesResult] = await Promise.all([
-        campaignsApi.list(),
-        templatesApi.list(),
-      ]);
-      const baseCampaigns = campaignsResult.data || [];
-      const templates = templatesResult.data || [];
-      const templateNameById = new Map(
-        templates.map((template) => [String(template.id), template.name]),
-      );
-
-      const campaignRows = baseCampaigns.map((campaign) => ({
-        ...campaign,
-        template_name: templateNameById.get(String(campaign.template_id)) || 'Unknown template',
-        sent: campaign.status_summary?.sent_recipients || 0,
-        total: campaign.status_summary?.total_recipients || 0,
-        failed: campaign.status_summary?.failed_recipients || 0,
-        pending: campaign.status_summary?.pending_recipients || 0,
-      }));
-
-      setCampaigns(campaignRows);
-    };
-
     loadCampaigns();
   }, []);
+
+  useEffect(() => {
+    const hasPendingCampaigns = campaigns.some((campaign) => campaign.pending > 0);
+    if (!hasPendingCampaigns) {
+      return undefined;
+    }
+
+    const intervalId = window.setInterval(() => {
+      loadCampaigns({ suppressGlobalLoading: true });
+    }, CAMPAIGN_REFRESH_INTERVAL_MS);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [campaigns]);
 
   const filteredCampaigns = useMemo(() => {
     const query = searchText.trim().toLowerCase();
@@ -123,11 +166,42 @@ export default function Campaigns() {
           : campaign,
       ),
     );
+
+    loadCampaigns({ suppressGlobalLoading: true });
   };
 
   const handleDeleteClick = (campaign) => {
     setDeleteError('');
     setCampaignToDelete(campaign);
+  };
+
+  const handleViewActivity = async (campaign) => {
+    setCampaignActivity(campaign);
+    setCampaignActivityRows([]);
+    setActivityError('');
+    setActivityLoading(true);
+
+    const result = await campaignsApi.listContacts(campaign.id);
+
+    setActivityLoading(false);
+
+    if (!result.data) {
+      setActivityError(
+        typeof result.error === 'string' ? result.error : 'Failed to load campaign activity',
+      );
+      return;
+    }
+
+    setCampaignActivityRows(result.data);
+  };
+
+  const handleCloseActivity = () => {
+    if (activityLoading) {
+      return;
+    }
+    setCampaignActivity(null);
+    setCampaignActivityRows([]);
+    setActivityError('');
   };
 
   const handleDeleteCancel = () => {
@@ -243,6 +317,14 @@ export default function Campaigns() {
                             </Link>
                             <button
                               type="button"
+                              disabled={isDeletingCurrent}
+                              onClick={() => handleViewActivity(campaign)}
+                              className="text-sm font-medium text-slate-700 transition-colors hover:text-slate-900 disabled:cursor-not-allowed disabled:text-gray-300"
+                            >
+                              View Activity
+                            </button>
+                            <button
+                              type="button"
                               disabled={!canDelete || isSendingCurrent || isDeletingCurrent}
                               onClick={() => handleDeleteClick(campaign)}
                               className="text-sm font-medium text-red-600 transition-colors hover:text-red-700 disabled:cursor-not-allowed disabled:text-gray-300"
@@ -284,6 +366,89 @@ export default function Campaigns() {
         onConfirm={handleDeleteConfirm}
         onCancel={handleDeleteCancel}
       />
+
+      {campaignActivity ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4">
+          <div className="flex max-h-[85vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+            <div className="border-b border-slate-200 px-6 py-5">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">Campaign Activity</h2>
+                  <p className="mt-1 text-sm text-slate-600">
+                    {campaignActivity.template_name} · {campaignActivity.sent} sent / {campaignActivity.total} total
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCloseActivity}
+                  disabled={activityLoading}
+                  className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-auto px-6 py-5">
+              {activityError ? (
+                <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                  {activityError}
+                </div>
+              ) : null}
+
+              {activityLoading ? (
+                <p className="text-sm text-slate-600">Loading recipient activity...</p>
+              ) : campaignActivityRows.length === 0 ? (
+                <p className="text-sm text-slate-600">No recipient activity found for this campaign.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-slate-200">
+                        <th className="px-3 py-3 text-left text-sm font-semibold text-slate-700">Recipient</th>
+                        <th className="px-3 py-3 text-left text-sm font-semibold text-slate-700">Status</th>
+                        <th className="px-3 py-3 text-left text-sm font-semibold text-slate-700">Processed</th>
+                        <th className="px-3 py-3 text-left text-sm font-semibold text-slate-700">Sent At</th>
+                        <th className="px-3 py-3 text-left text-sm font-semibold text-slate-700">Error</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {campaignActivityRows.map((row) => (
+                        <tr key={row.id} className="border-b border-slate-100 align-top">
+                          <td className="px-3 py-3 text-sm text-slate-900">
+                            <div className="font-medium">{row.contact_name}</div>
+                            <div className="text-slate-600">{row.contact_email}</div>
+                            <div className="text-slate-500">
+                              {row.contact_company}
+                              {row.contact_job_title ? ` · ${row.contact_job_title}` : ''}
+                            </div>
+                          </td>
+                          <td className="px-3 py-3 text-sm">
+                            <span
+                              className={`rounded px-2 py-1 text-xs ${getRecipientStatusColor(row.status)}`}
+                            >
+                              {capitalize(row.status)}
+                            </span>
+                          </td>
+                          <td className="px-3 py-3 text-sm text-slate-600">
+                            {formatDateTime(row.processed_at)}
+                          </td>
+                          <td className="px-3 py-3 text-sm text-slate-600">
+                            {formatDateTime(row.sent_at)}
+                          </td>
+                          <td className="px-3 py-3 text-sm text-slate-600">
+                            {row.error_message || '-'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
